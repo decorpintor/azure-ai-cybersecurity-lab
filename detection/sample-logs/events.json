@@ -1,0 +1,44 @@
+[
+  {
+    "timestamp": "2026-11-12T19:34:41.571435+00:00",
+    "event_type": "login",
+    "status": "failed",
+    "source_ip": "192.0.2.50",
+    "username": "admin"
+  },
+  {
+    "timestamp": "2026-11-12T19:34:42.571435+00:00",
+    "event_type": "login",
+    "status": "failed",
+    "source_ip": "192.0.2.50",
+    "username": "admin"
+  },
+  {
+    "timestamp": "2026-11-12T19:34:43.571435+00:00",
+    "event_type": "login",
+    "status": "failed",
+    "source_ip": "192.0.2.50",
+    "username": "admin"
+  },
+  {
+    "timestamp": "2026-11-12T19:34:44.571435+00:00",
+    "event_type": "login",
+    "status": "failed",
+    "source_ip": "192.0.2.50",
+    "username": "admin"
+  },
+  {
+    "timestamp": "2026-11-12T19:34:45.571435+00:00",
+    "event_type": "login",
+    "status": "failed",
+    "source_ip": "192.0.2.50",
+    "username": "admin"
+  },
+  {
+    "timestamp": "2026-11-12T19:35:11.571435+00:00",
+    "event_type": "privilege_escalation",
+    "status": "success",
+    "source_ip": "192.0.2.75",
+    "username": "testuser"
+  }
+]
