@@ -1,7 +1,7 @@
 import json
 import logging
-from urllib.error import URLError
 
+import httpx
 import pytest
 
 from ai import incident_analyst, ollama_client
@@ -32,20 +32,17 @@ class MockResponse:
     def __init__(self, data):
         self.data = data
 
-    def __enter__(self):
-        return self
+    def json(self):
+        return self.data
 
-    def __exit__(self, *args):
+    def raise_for_status(self):
         pass
-
-    def read(self):
-        return json.dumps(self.data).encode("utf-8")
 
 
 def mock_ollama_response(monkeypatch, response):
     monkeypatch.setattr(
-        ollama_client.urllib.request,
-        "urlopen",
+        ollama_client.httpx,
+        "post",
         lambda *args, **kwargs: MockResponse(response),
     )
 
@@ -66,29 +63,29 @@ def test_successful_ollama_response(monkeypatch):
 
 def test_ollama_unavailable(monkeypatch):
     def unavailable(*args, **kwargs):
-        raise URLError("Ollama unavailable")
+        raise httpx.ConnectError("Ollama unavailable")
 
     monkeypatch.setattr(
-        ollama_client.urllib.request,
-        "urlopen",
+        ollama_client.httpx,
+        "post",
         unavailable,
     )
 
-    with pytest.raises(URLError):
+    with pytest.raises(httpx.ConnectError):
         ollama_client.analyze_alert_with_ollama(SAMPLE_ALERT)
 
 
 def test_ollama_timeout(monkeypatch):
     def timeout(*args, **kwargs):
-        raise TimeoutError("Ollama request timed out")
+        raise httpx.TimeoutException("Ollama request timed out")
 
     monkeypatch.setattr(
-        ollama_client.urllib.request,
-        "urlopen",
+        ollama_client.httpx,
+        "post",
         timeout,
     )
 
-    with pytest.raises(TimeoutError):
+    with pytest.raises(httpx.TimeoutException):
         ollama_client.analyze_alert_with_ollama(SAMPLE_ALERT)
 
 
@@ -114,6 +111,28 @@ def test_missing_required_response_fields(monkeypatch):
     )
 
     with pytest.raises(ValueError, match="missing required fields"):
+        ollama_client.analyze_alert_with_ollama(SAMPLE_ALERT)
+
+
+def test_invalid_ollama_url_rejected(monkeypatch):
+    monkeypatch.setattr(
+        ollama_client,
+        "OLLAMA_URL",
+        "file:///etc/passwd",
+    )
+
+    with pytest.raises(ValueError, match="HTTP or HTTPS"):
+        ollama_client.analyze_alert_with_ollama(SAMPLE_ALERT)
+
+
+def test_ollama_url_without_hostname_rejected(monkeypatch):
+    monkeypatch.setattr(
+        ollama_client,
+        "OLLAMA_URL",
+        "http:///api",
+    )
+
+    with pytest.raises(ValueError, match="hostname"):
         ollama_client.analyze_alert_with_ollama(SAMPLE_ALERT)
 
 
@@ -147,6 +166,7 @@ def test_deterministic_analysis_survives_ai_failure(monkeypatch, caplog):
 
     assert "Local AI analysis failed for rule BRUTE_FORCE" in caplog.text
     assert "Ollama unavailable" in caplog.text
+
 
 def test_ai_disabled_does_not_call_ollama(monkeypatch):
     def unexpected_call(alert):

@@ -1,6 +1,8 @@
 import json
 import os
-import urllib.request
+from urllib.parse import urlsplit
+
+import httpx
 
 
 OLLAMA_URL = os.getenv(
@@ -18,11 +20,40 @@ OLLAMA_TIMEOUT = int(
 )
 
 
+def validate_ollama_url(url):
+    """Allow only valid HTTP or HTTPS Ollama endpoints."""
+
+    try:
+        parsed = urlsplit(url)
+
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError("Ollama URL must use HTTP or HTTPS")
+
+        if not parsed.hostname:
+            raise ValueError("Ollama URL must include a hostname")
+
+        if parsed.username or parsed.password:
+            raise ValueError("Ollama URL must not contain credentials")
+
+        if parsed.query or parsed.fragment:
+            raise ValueError("Ollama URL must not contain query parameters")
+
+        return url.rstrip("/")
+
+    except ValueError as exc:
+        raise ValueError(f"Invalid Ollama URL: {exc}") from exc
+
+
 def analyze_alert_with_ollama(alert):
     """
     Send a security alert to the local Ollama model.
     Return validated JSON analysis.
     """
+
+    endpoint = validate_ollama_url(OLLAMA_URL)
+
+    if OLLAMA_TIMEOUT <= 0:
+        raise ValueError("Ollama timeout must be positive")
 
     prompt = f"""
 You are an assistant to a cybersecurity SOC analyst.
@@ -65,19 +96,15 @@ Security alert:
         },
     }
 
-    request = urllib.request.Request(
-        f"{OLLAMA_URL.rstrip('/')}/api/generate",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
+    response = httpx.post(
+        f"{endpoint}/api/generate",
+        json=payload,
+        timeout=OLLAMA_TIMEOUT,
     )
 
-    with urllib.request.urlopen(
-        request,
-        timeout=OLLAMA_TIMEOUT,
-    ) as response:
-        result = json.loads(response.read().decode("utf-8"))
+    response.raise_for_status()
 
+    result = response.json()
     analysis = json.loads(result["response"])
 
     required_fields = {
